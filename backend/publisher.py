@@ -180,4 +180,11 @@ def publish_events() -> None:
 
 
 if __name__ == "__main__":
-    publish_events()
+    logger.info("Starting publisher loop...")
+    while True:
+        try:
+            publish_events()
+        except Exception as exc:
+            logger.exception("Unexpected error in publisher loop: %s", exc)
+        # espera unos segundos antes de volver a chequear
+        time.sleep(30)
