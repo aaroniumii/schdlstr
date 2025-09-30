@@ -44,6 +44,8 @@ def init_db() -> None:
 
     default_relays = [
         "wss://relay.damus.io",
+        "wss://librerelay.aaroniumii.com",
+        "wss://librewot.aaroniumii.com,
         "wss://nostr-pub.wellorder.net",
         "wss://nos.lol",
         "wss://relay.snort.social",
