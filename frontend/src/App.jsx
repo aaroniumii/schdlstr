@@ -14,7 +14,13 @@ function App() {
         <ScheduledList />
       </div>
       <footer className="mt-10 text-center text-sm text-gray-600">
-        Contributions and greetings • <a href="https://getalby.com/p/algorithm6028" className="underline">algorithm6028@getalby.com</a>
+        Contributions and greetings •
+        <a
+          href="https://getalby.com/p/algorithm6028"
+          className="underline ml-1"
+        >
+          algorithm6028@getalby.com
+        </a>
       </footer>
     </div>
   );

@@ -34,6 +34,8 @@ uvicorn main:app --reload  # Inicia el servidor
 
 ```
 
+Los archivos enviados desde el frontend se guardan en `backend/uploads/` y se sirven automáticamente desde `/uploads/<archivo>`.
+
 ### 3. Frontend (React + Vite)
 
 ```bash
