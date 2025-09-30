@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import time
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import datetime, timedelta, timezone
+from typing import Iterable
 
-from dotenv import load_dotenv
 from nostr.event import Event
 from nostr.relay_manager import RelayManager
 
-load_dotenv()
+from config import configure_logging, settings
+
+configure_logging()
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_RELAYS = [
     "wss://relay.damus.io",
@@ -23,46 +27,134 @@ DEFAULT_RELAYS = [
     "wss://nostr.mom",
 ]
 
-BASE_DIR = Path(__file__).resolve().parent
-CONFIG_FILE = BASE_DIR / "relays.json"
-DB_FILE = BASE_DIR / "scheduler.db"
-
 
 def load_relays() -> list[str]:
-    if CONFIG_FILE.exists():
+    relays_path = settings.relays_path
+    if relays_path.exists():
         try:
-            return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+            return json.loads(relays_path.read_text(encoding="utf-8"))
         except Exception as exc:  # pragma: no cover - defensive
-            print("⚠️ Error leyendo relays.json, usando valores por defecto:", exc)
+            logger.warning("Error reading relays.json, falling back to defaults: %s", exc)
     return DEFAULT_RELAYS
 
 
+def _calculate_next_retry(attempt: int) -> datetime:
+    delay = settings.retry_base_seconds * (2 ** max(attempt - 1, 0))
+    delay = min(delay, settings.retry_max_seconds)
+    return datetime.now(timezone.utc) + timedelta(seconds=delay)
+
+
+def _mark_failure(
+    cursor: sqlite3.Cursor,
+    event_id: str,
+    attempts: int,
+    error_message: str,
+) -> None:
+    next_attempt_at: str | None
+    status: str
+    if attempts >= settings.max_publish_attempts:
+        status = "error"
+        next_attempt_at = None
+    else:
+        status = "retrying"
+        next_attempt_at = _calculate_next_retry(attempts).isoformat()
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    cursor.execute(
+        """
+        UPDATE scheduled_events
+        SET attempt_count = ?,
+            status = ?,
+            last_error = ?,
+            last_attempt_at = ?,
+            next_attempt_at = ?,
+            sent = 0
+        WHERE id = ?
+        """,
+        (attempts, status, error_message, now_iso, next_attempt_at, event_id),
+    )
+    logger.error(
+        "Failed to publish event %s (attempt %s/%s): %s",
+        event_id,
+        attempts,
+        settings.max_publish_attempts,
+        error_message,
+    )
+
+
+def _mark_success(cursor: sqlite3.Cursor, event_id: str, attempts: int) -> None:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    cursor.execute(
+        """
+        UPDATE scheduled_events
+        SET sent = 1,
+            status = 'sent',
+            attempt_count = ?,
+            last_error = NULL,
+            last_attempt_at = ?,
+            next_attempt_at = NULL
+        WHERE id = ?
+        """,
+        (attempts, now_iso, event_id),
+    )
+    logger.info("Published event %s", event_id)
+
+
+def _load_pending_events(cursor: sqlite3.Cursor, now_iso: str) -> Iterable[sqlite3.Row]:
+    cursor.execute(
+        """
+        SELECT id, event_json, attempt_count
+        FROM scheduled_events
+        WHERE sent = 0
+          AND publish_at <= ?
+          AND status IN ('scheduled', 'retrying')
+          AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+        ORDER BY publish_at ASC
+        """,
+        (now_iso, now_iso),
+    )
+    return cursor.fetchall()
+
+
 def publish_events() -> None:
-    try:
-        with sqlite3.connect(DB_FILE) as conn:
-            conn.row_factory = sqlite3.Row
-            c = conn.cursor()
+    with sqlite3.connect(settings.database_path) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
 
-            now_iso = datetime.now(timezone.utc).isoformat()
-            c.execute(
-                "SELECT id, event_json FROM scheduled_events WHERE publish_at <= ? AND sent = 0",
-                (now_iso,),
-            )
-            rows = c.fetchall()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        rows = _load_pending_events(cursor, now_iso)
 
-            if not rows:
-                print("No hay eventos pendientes.")
+        if not rows:
+            logger.info("No pending events to publish.")
+            return
+
+        relays = load_relays()
+        if not relays:
+            logger.warning("No relays configured; marking %s events as failed", len(rows))
+            for row in rows:
+                _mark_failure(cursor, row["id"], row["attempt_count"] + 1, "No relays configured")
+            conn.commit()
+            return
+
+        manager = RelayManager()
+        for relay in relays:
+            manager.add_relay(relay)
+
+        try:
+            try:
+                manager.open_connections()
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.exception("Unable to open relay connections: %s", exc)
+                for row in rows:
+                    _mark_failure(cursor, row["id"], row["attempt_count"] + 1, str(exc))
+                conn.commit()
                 return
 
-            relays = load_relays()
-            manager = RelayManager()
-            for relay in relays:
-                manager.add_relay(relay)
-            manager.open_connections()
             time.sleep(1.25)
 
             for row in rows:
                 event_id = row["id"]
+                attempts = row["attempt_count"] + 1
                 data = json.loads(row["event_json"])
 
                 event = Event(
@@ -75,19 +167,16 @@ def publish_events() -> None:
                 event.id = data["id"]
                 event.signature = data["sig"]
 
-                manager.publish_event(event)
-                print(f"✅ Evento publicado: {event_id}")
-
-                c.execute(
-                    "UPDATE scheduled_events SET sent = 1 WHERE id = ?",
-                    (event_id,),
-                )
+                try:
+                    manager.publish_event(event)
+                    _mark_success(cursor, event_id, attempts)
+                except Exception as exc:  # pragma: no cover - network failure
+                    _mark_failure(cursor, event_id, attempts, str(exc))
 
             conn.commit()
             time.sleep(1)
+        finally:
             manager.close_connections()
-    except Exception as exc:  # pragma: no cover - defensive
-        print(f"❌ Error al publicar eventos: {exc}")
 
 
 if __name__ == "__main__":

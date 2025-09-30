@@ -3,5 +3,4 @@ uvicorn
 pydantic
 nostr
 python-dotenv
-python-multipart
 
