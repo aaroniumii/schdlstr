@@ -1,4 +1,0 @@
-* * * * * /home/aaroniumint/Documents/ServerDisk2/Software/Nostr/Bot/programstr2/backend/venv/bin/python /home/aaroniumint/Documents/ServerDisk2/Software/Nostr/Bot/programstr2/backend/publisher.py >> /home/aaroniumint/Documents/ServerDisk2/Software/Nostr/Bot/programstr2/backend/cron.log 2>&1
-
-
-* * * * * /home/aaroniubuntu/nostr/schdlstr/backend/venv/bin/python /home/aaroniubuntu/nostr/schdlstr/backend/publisher.py >> /home/aaroniubuntu/nostr/schdlstr/backend/cron.log 2>&1

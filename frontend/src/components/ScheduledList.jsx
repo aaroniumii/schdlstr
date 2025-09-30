@@ -3,23 +3,32 @@ import React, { useEffect, useState } from "react";
 
 export default function ScheduledList() {
   const [events, setEvents] = useState([]);
+  const [status, setStatus] = useState("Loading scheduled posts...");
 
   useEffect(() => {
     const fetchEvents = async () => {
-      if (!window.nostr) return;
+      if (!window.nostr) {
+        setStatus("Connect a NIP-07 extension to view scheduled posts.");
+        return;
+      }
       try {
         const pubkey = await window.nostr.getPublicKey();
         const res = await fetch(`/scheduled?pubkey=${pubkey}`);
+        if (!res.ok) {
+          throw new Error(`Request failed with status ${res.status}`);
+        }
         const data = await res.json();
         setEvents(data);
+        setStatus(data.length ? "" : "No scheduled posts.");
       } catch (err) {
         console.error("Error loading scheduled notes:", err);
+        setStatus("Unable to load scheduled posts. Try again later.");
       }
     };
     fetchEvents();
   }, []);
 
-  if (events.length === 0) return <p>No scheduled posts.</p>;
+  if (status && events.length === 0) return <p>{status}</p>;
 
   return (
     <div>

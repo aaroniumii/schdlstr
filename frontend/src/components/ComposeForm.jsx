@@ -1,5 +1,5 @@
 // frontend/src/components/ComposeForm.jsx
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { getEventHash } from "nostr-tools";
 
 export default function ComposeForm() {
@@ -26,7 +26,6 @@ export default function ComposeForm() {
     const form = new FormData();
     form.append("file", file);
     try {
-      // Ahora usamos el proxy '/upload' definido en vite.config.js
       const res = await fetch("/upload", {
         method: "POST",
         body: form,
@@ -34,7 +33,10 @@ export default function ComposeForm() {
       if (!res.ok) throw new Error("Upload failed");
       const { url } = await res.json();
       // Insertamos la URL directamente en el textarea
-      setContent((prev) => `${prev}\n\n![media](${url})`);
+      setContent((prev) => {
+        const separator = prev ? "\n\n" : "";
+        return `${prev}${separator}![media](${url})`;
+      });
       setStatus("Media uploaded. Adjust its position as needed.");
     } catch (err) {
       console.error(err);
@@ -60,10 +62,12 @@ export default function ComposeForm() {
       event.id = getEventHash(event);
       const signedEvent = await window.nostr.signEvent(event);
 
+      const publishAtIso = new Date(datetime).toISOString();
+
       const res = await fetch("/schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ event: signedEvent, publish_at: datetime }),
+        body: JSON.stringify({ event: signedEvent, publish_at: publishAtIso }),
       });
 
       if (res.ok) {
