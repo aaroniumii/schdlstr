@@ -17,7 +17,7 @@ Nostr Scheduler is a full-stack web application that lets you draft notes, sign 
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/tuusuario/nostr-scheduler.git
+git clone https://github.com/aaroniumii/schdlstr.git
 cd nostr-scheduler
 ```
 
