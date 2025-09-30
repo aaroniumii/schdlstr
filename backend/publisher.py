@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_RELAYS = [
     "wss://relay.damus.io",
     "wss://nostr-pub.wellorder.net",
+    "wss://librerelay.aaroniumii.com",
+    "wss://librewot.aaroniumii.com",
     "wss://nos.lol",
     "wss://relay.snort.social",
     "wss://offchain.pub",
