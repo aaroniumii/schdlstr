@@ -13,7 +13,7 @@ export default function ComposeForm() {
       if (window.nostr) {
         setPubkey(await window.nostr.getPublicKey());
       } else {
-        setStatus("Please complete all fields and enable NIP-07.");
+        setStatus("Please complete all fields and enable NIP-05.");
       }
     })();
   }, []);
@@ -21,7 +21,7 @@ export default function ComposeForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!content || !datetime || !window.nostr) {
-      setStatus("Please complete all fields and enable NIP-07.");
+      setStatus("Please complete all fields and enable NIP-05.");
       return;
     }
     if (new Date(datetime) <= new Date()) {
