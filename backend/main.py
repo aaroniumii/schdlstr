@@ -35,7 +35,8 @@ def init_db() -> None:
                 attempt_count INTEGER DEFAULT 0,
                 last_error TEXT,
                 last_attempt_at TEXT,
-                next_attempt_at TEXT
+                next_attempt_at TEXT,
+                pubkey TEXT
             )
             """
         )
@@ -46,16 +47,32 @@ def init_db() -> None:
             "last_error": "ALTER TABLE scheduled_events ADD COLUMN last_error TEXT",
             "last_attempt_at": "ALTER TABLE scheduled_events ADD COLUMN last_attempt_at TEXT",
             "next_attempt_at": "ALTER TABLE scheduled_events ADD COLUMN next_attempt_at TEXT",
+            "pubkey": "ALTER TABLE scheduled_events ADD COLUMN pubkey TEXT",
         }
         for column, statement in column_alters.items():
             if column not in existing_columns:
                 c.execute(statement)
+                if column == "pubkey":
+                    rows = c.execute(
+                        "SELECT id, event_json FROM scheduled_events WHERE pubkey IS NULL"
+                    ).fetchall()
+                    for row in rows:
+                        try:
+                            event_data = json.loads(row[1])
+                        except json.JSONDecodeError:
+                            continue
+                        pubkey = event_data.get("pubkey")
+                        if pubkey:
+                            c.execute(
+                                "UPDATE scheduled_events SET pubkey = ? WHERE id = ?",
+                                (pubkey, row[0]),
+                            )
         conn.commit()
 
     default_relays = [
         "wss://relay.damus.io",
         "wss://librerelay.aaroniumii.com",
-        "wss://librewot.aaroniumii.com,
+        "wss://librewot.aaroniumii.com",
         "wss://nostr-pub.wellorder.net",
         "wss://nos.lol",
         "wss://relay.snort.social",
@@ -98,6 +115,10 @@ def schedule_event(data: ScheduledEvent):
     if not event_id:
         raise HTTPException(status_code=400, detail="Missing event ID")
 
+    pubkey = data.event.get("pubkey")
+    if not pubkey:
+        raise HTTPException(status_code=400, detail="Missing event pubkey")
+
     try:
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
@@ -112,10 +133,11 @@ def schedule_event(data: ScheduledEvent):
                     attempt_count,
                     last_error,
                     last_attempt_at,
-                    next_attempt_at
-                ) VALUES (?, ?, ?, 0, 'scheduled', 0, NULL, NULL, NULL)
+                    next_attempt_at,
+                    pubkey
+                ) VALUES (?, ?, ?, 0, 'scheduled', 0, NULL, NULL, NULL, ?)
                 """,
-                (event_id, json.dumps(data.event), publish_at_dt.isoformat()),
+                (event_id, json.dumps(data.event), publish_at_dt.isoformat(), pubkey),
             )
             conn.commit()
     except sqlite3.IntegrityError as exc:
@@ -135,7 +157,7 @@ def get_scheduled(pubkey: str | None = None):
     """
     params: tuple[str, ...] = ()
     if pubkey:
-        query += " WHERE json_extract(event_json, '$.pubkey') = ?"
+        query += " WHERE pubkey = ?"
         params = (pubkey,)
     query += " ORDER BY publish_at DESC"
 
