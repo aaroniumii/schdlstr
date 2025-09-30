@@ -1,7 +1,7 @@
 {
   "name": "nostr-scheduler-frontend",
   "version": "1.0.0",
-  "description": "Frontend para programar publicaciones en Nostr",
+  "description": "Schedule notes and other stuff",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
