@@ -1,30 +1,24 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
 import json
+import logging
 import sqlite3
+from datetime import datetime, timezone
+from typing import Any
 
-from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-load_dotenv()
+from config import configure_logging, settings
 
-BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "scheduler.db"
-RELAYS_PATH = BASE_DIR / "relays.json"
-UPLOAD_DIR = BASE_DIR / "uploads"
+configure_logging()
+
+logger = logging.getLogger(__name__)
+
+DB_PATH = settings.database_path
+RELAYS_PATH = settings.relays_path
 
 app = FastAPI()
-
-
-def ensure_directories() -> None:
-    """Create directories required by the application."""
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def init_db() -> None:
@@ -36,10 +30,26 @@ def init_db() -> None:
                 id TEXT PRIMARY KEY,
                 event_json TEXT NOT NULL,
                 publish_at TEXT NOT NULL,
-                sent INTEGER DEFAULT 0
+                sent INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'scheduled',
+                attempt_count INTEGER DEFAULT 0,
+                last_error TEXT,
+                last_attempt_at TEXT,
+                next_attempt_at TEXT
             )
             """
         )
+        existing_columns = {row[1] for row in c.execute("PRAGMA table_info(scheduled_events)")}
+        column_alters = {
+            "status": "ALTER TABLE scheduled_events ADD COLUMN status TEXT DEFAULT 'scheduled'",
+            "attempt_count": "ALTER TABLE scheduled_events ADD COLUMN attempt_count INTEGER DEFAULT 0",
+            "last_error": "ALTER TABLE scheduled_events ADD COLUMN last_error TEXT",
+            "last_attempt_at": "ALTER TABLE scheduled_events ADD COLUMN last_attempt_at TEXT",
+            "next_attempt_at": "ALTER TABLE scheduled_events ADD COLUMN next_attempt_at TEXT",
+        }
+        for column, statement in column_alters.items():
+            if column not in existing_columns:
+                c.execute(statement)
         conn.commit()
 
     default_relays = [
@@ -54,10 +64,9 @@ def init_db() -> None:
         RELAYS_PATH.write_text(json.dumps(default_relays, indent=2), encoding="utf-8")
 
 
-ensure_directories()
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+RELAYS_PATH.parent.mkdir(parents=True, exist_ok=True)
 init_db()
-
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 
 class ScheduledEvent(BaseModel):
@@ -91,7 +100,19 @@ def schedule_event(data: ScheduledEvent):
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             c.execute(
-                "INSERT INTO scheduled_events (id, event_json, publish_at) VALUES (?, ?, ?)",
+                """
+                INSERT INTO scheduled_events (
+                    id,
+                    event_json,
+                    publish_at,
+                    sent,
+                    status,
+                    attempt_count,
+                    last_error,
+                    last_attempt_at,
+                    next_attempt_at
+                ) VALUES (?, ?, ?, 0, 'scheduled', 0, NULL, NULL, NULL)
+                """,
                 (event_id, json.dumps(data.event), publish_at_dt.isoformat()),
             )
             conn.commit()
@@ -100,13 +121,14 @@ def schedule_event(data: ScheduledEvent):
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    logger.info("Scheduled event %s for %s", event_id, publish_at_dt.isoformat())
     return {"status": "ok", "event_id": event_id}
 
 
 @app.get("/scheduled")
 def get_scheduled(pubkey: str | None = None):
     query = """
-        SELECT id, event_json, publish_at, sent
+        SELECT id, event_json, publish_at, sent, status, attempt_count, last_error, last_attempt_at, next_attempt_at
         FROM scheduled_events
     """
     params: tuple[str, ...] = ()
@@ -133,28 +155,41 @@ def get_scheduled(pubkey: str | None = None):
                 "content": event_data.get("content", ""),
                 "publish_at": row["publish_at"],
                 "sent": bool(row["sent"]),
+                "status": row["status"],
+                "attempt_count": row["attempt_count"],
+                "last_error": row["last_error"],
+                "last_attempt_at": row["last_attempt_at"],
+                "next_attempt_at": row["next_attempt_at"],
             }
         )
 
     return events
 
 
-@app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="Missing filename")
+@app.post("/scheduled/{event_id}/retry")
+def retry_event(event_id: str):
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("SELECT id FROM scheduled_events WHERE id = ?", (event_id,))
+        row = c.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Event not found")
 
-    sanitized_name = Path(file.filename).name
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    final_name = f"{timestamp}_{sanitized_name}"
-    destination = UPLOAD_DIR / final_name
+        c.execute(
+            """
+            UPDATE scheduled_events
+            SET sent = 0,
+                status = 'scheduled',
+                attempt_count = 0,
+                last_error = NULL,
+                last_attempt_at = NULL,
+                next_attempt_at = NULL
+            WHERE id = ?
+            """,
+            (event_id,),
+        )
+        conn.commit()
 
-    try:
-        with destination.open("wb") as buffer:
-            contents = await file.read()
-            buffer.write(contents)
-    except Exception as exc:  # pragma: no cover - defensive
-        raise HTTPException(status_code=500, detail="Failed to store file") from exc
-
-    return JSONResponse({"url": f"/uploads/{final_name}"})
+    logger.info("Event %s marked for retry", event_id)
+    return {"status": "queued", "event_id": event_id}
 

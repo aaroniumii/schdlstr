@@ -28,13 +28,22 @@ cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-python main.py  # Inicializa base de datos y relays.json
 uvicorn main:app --reload  # Inicia el servidor
-#uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
 ```
 
-Los archivos enviados desde el frontend se guardan en `backend/uploads/` y se sirven automáticamente desde `/uploads/<archivo>`.
+El backend utiliza variables de entorno (prefijo `SCHDLSTR_`) para configurar rutas de base de datos, archivo de relays y políticas de reintentos. Puedes copiar el archivo `.env.example` y ajustar los valores necesarios:
+
+```bash
+cp .env.example .env
+```
+
+Variables disponibles más relevantes:
+
+- `SCHDLSTR_DATABASE_PATH`: ruta al archivo SQLite.
+- `SCHDLSTR_RELAYS_PATH`: ruta al archivo `relays.json`.
+- `SCHDLSTR_MAX_PUBLISH_ATTEMPTS`: número máximo de reintentos por evento.
+- `SCHDLSTR_RETRY_BASE_SECONDS` y `SCHDLSTR_RETRY_MAX_SECONDS`: control del backoff exponencial.
+- `SCHDLSTR_LOG_LEVEL`: nivel de logs (`INFO`, `DEBUG`, etc.).
 
 ### 3. Frontend (React + Vite)
 
@@ -59,6 +68,26 @@ Agregar esta línea (ajustando las rutas):
 ```bash
 * * * * * /ruta/a/venv/bin/python /ruta/a/backend/publisher.py >> /ruta/a/backend/cron.log 2>&1
 ```
+
+El publicador gestiona reintentos automáticos con backoff exponencial y marca los eventos con estados (`scheduled`, `retrying`, `error`, `sent`). Los eventos en estado `error` pueden reintentarse manualmente desde el frontend.
+
+---
+
+## 🐳 Uso con Docker
+
+El proyecto incluye `Dockerfile` separados para backend y frontend, además de `docker-compose.yml` para orquestar los servicios:
+
+```bash
+docker-compose up --build
+```
+
+Servicios incluidos:
+
+- **backend**: API FastAPI con Uvicorn.
+- **worker**: ejecuta `publisher.py` de forma continua para despachar eventos.
+- **frontend**: aplicación React servida mediante Nginx.
+
+Los volúmenes compartidos aseguran que backend y worker usen la misma base de datos y archivo de configuración de relays. Ajusta variables de entorno en `docker-compose.yml` según tu despliegue.
 
 ---
 

@@ -7,7 +7,6 @@ export default function ComposeForm() {
   const [datetime, setDatetime] = useState("");
   const [status, setStatus] = useState("");
   const [pubkey, setPubkey] = useState("");
-  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -18,33 +17,6 @@ export default function ComposeForm() {
       }
     })();
   }, []);
-
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setUploading(true);
-    const form = new FormData();
-    form.append("file", file);
-    try {
-      const res = await fetch("/upload", {
-        method: "POST",
-        body: form,
-      });
-      if (!res.ok) throw new Error("Upload failed");
-      const { url } = await res.json();
-      // Insertamos la URL directamente en el textarea
-      setContent((prev) => {
-        const separator = prev ? "\n\n" : "";
-        return `${prev}${separator}![media](${url})`;
-      });
-      setStatus("Media uploaded. Adjust its position as needed.");
-    } catch (err) {
-      console.error(err);
-      setStatus("Error uploading media.");
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -94,20 +66,6 @@ export default function ComposeForm() {
           className="w-full p-2 border rounded"
           rows="4"
         />
-      </div>
-
-      {/* Subir imagen */}
-      <div>
-        <label className="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded cursor-pointer hover:bg-blue-700">
-          <span>{uploading ? "Uploading..." : "Upload Image"}</span>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            disabled={uploading}
-            className="hidden"
-          />
-        </label>
       </div>
 
       {/* Fecha y hora */}
