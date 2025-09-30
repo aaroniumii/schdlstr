@@ -6,7 +6,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseSettings, validator
+from pydantic_settings import BaseSettings
+from pydantic import field_validator
 
 
 BASE_DIR = Path(__file__).resolve().parent
