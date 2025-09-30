@@ -28,13 +28,13 @@ class Settings(BaseSettings):
         env_file = BASE_DIR.parent / ".env"
         env_file_encoding = "utf-8"
 
-    @validator("database_path", "relays_path", pre=True)
+    @field_validator("database_path", "relays_path", mode="before")
     def _ensure_path(cls, value: Any) -> Path:  # type: ignore[override]
         if isinstance(value, Path):
             return value
         return Path(str(value))
 
-    @validator("log_level")
+    @field_validator("log_level")
     def _validate_log_level(cls, value: str) -> str:  # type: ignore[override]
         return value.upper()
 
