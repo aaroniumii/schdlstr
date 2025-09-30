@@ -1,0 +1,19 @@
+{
+  "name": "nostr-scheduler-frontend",
+  "version": "1.0.0",
+  "description": "Frontend para programar publicaciones en Nostr",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "nostr-tools": "^1.13.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.0.0",
+    "vite": "^6.2.6"
+  }
+}

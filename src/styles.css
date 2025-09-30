@@ -1,0 +1,79 @@
+/* frontend/src/styles.css */
+
+/* Fondo degradado vibrante estilo Damus */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, sans-serif;
+  background: linear-gradient(135deg, #405DE6 0%, #5851DB 25%, #833AB4 50%, #C13584 75%, #E1306C 100%);
+  color: #fff;
+  min-height: 100vh;
+}
+
+/* Contenedor principal con fondo semitransparente */
+.main-container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 1rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  color: #111;
+}
+
+/* Titulares oscuros dentro del contenedor */
+h1, h2 {
+  margin-bottom: 1rem;
+  color: #111;
+}
+
+/* Tarjetas para formularios y listas */
+.card {
+  background: #fff;
+  color: #111;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Inputs estilizados */
+input,
+textarea {
+  background: #fff;
+  color: #111;
+  border: none;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 0.75rem 1rem;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+/* Botones llamativos */
+button {
+  background: #405DE6;
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: background 0.2s ease;
+  margin-top: 1rem;
+}
+
+button:hover {
+  background: #833AB4;
+}
+
+/* Estados de publicación */
+.status-pending {
+  color: #E1306C;
+}
+
+.status-sent {
+  color: #00A86B;
+}
+
