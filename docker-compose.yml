@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
+    container_name: schdlstr-backend
     environment:
       - SCHDLSTR_DATABASE_PATH=/app/data/scheduler.db
       - SCHDLSTR_RELAYS_PATH=/app/data/relays.json
@@ -13,11 +14,13 @@ services:
       - backend_data:/app/data
     ports:
       - "8000:8000"
+    restart: unless-stopped
 
   worker:
     build:
       context: .
       dockerfile: Dockerfile.backend
+    container_name: schdlstr-worker
     depends_on:
       - backend
     environment:
@@ -27,13 +30,18 @@ services:
     volumes:
       - backend_data:/app/data
     command: ["python", "publisher.py"]
+    restart: unless-stopped
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+    container_name: schdlstr-frontend
     ports:
-      - "5173:80"
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
   backend_data:
