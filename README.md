@@ -1,6 +1,6 @@
 # Nostr Scheduler
 
-Nostr Scheduler is a full-stack web application that lets you draft notes, sign them locally with a NIP-07 browser extension, and queue them for automatic publication on the Nostr network. The React frontend handles note creation and signing, while the FastAPI backend stores pending events in SQLite and a worker process publishes them to your configured relays at the scheduled time—even if your browser is closed.
+Nostr Scheduler is a full-stack web application that lets you draft notes, sign them locally with a NIP-05 browser extension, and queue them for automatic publication on the Nostr network. The React frontend handles note creation and signing, while the FastAPI backend stores pending events in SQLite and a worker process publishes them to your configured relays at the scheduled time—even if your browser is closed.
 
 ---
 
@@ -52,7 +52,7 @@ npm install
 npm run dev  # available at http://localhost:5173
 ```
 
-Connect a NIP-07 compatible extension (such as Alby) to authorize the frontend. Draft your note, choose a future publication date, and the frontend will sign the event locally and send it to the backend.
+Connect a NIP-05 compatible extension (such as Alby) to authorize the frontend. Draft your note, choose a future publication date, and the frontend will sign the event locally and send it to the backend.
 
 ---
 
@@ -119,7 +119,7 @@ Shared volumes ensure the backend API and the worker share the same database and
 
 1. Start the backend API and publisher worker.
 2. Run `npm run dev` in the frontend and open it in your browser.
-3. Connect a NIP-07 extension and approve the request for your public key.
+3. Connect a NIP-05 extension and approve the request for your public key.
 4. Write a note, pick a future datetime, and schedule it.
 5. Wait for the worker to publish the event, then confirm it through a Nostr client such as [iris.to](https://iris.to) or [snort.social](https://snort.social).
 
