@@ -52,7 +52,7 @@ npm install
 npm run dev  # available at http://localhost:5173
 ```
 
-Connect a NIP-05 compatible extension (such as Alby) to authorize the frontend. Draft your note, choose a future publication date, and the frontend will sign the event locally and send it to the backend.
+Connect a NIP-05 compatible extension (such as Alby) **or** paste an Amber Bunker link when prompted to authorize the frontend. Draft your note, choose a future publication date, and the frontend will sign the event locally (via extension or Bunker remote signer) and send it to the backend.
 
 ---
 
@@ -119,7 +119,7 @@ Shared volumes ensure the backend API and the worker share the same database and
 
 1. Start the backend API and publisher worker.
 2. Run `npm run dev` in the frontend and open it in your browser.
-3. Connect a NIP-05 extension and approve the request for your public key.
+3. Connect a NIP-05 extension (or paste a Bunker link and approve it in Amber) to share your public key.
 4. Write a note, pick a future datetime, and schedule it.
 5. Wait for the worker to publish the event, then confirm it through a Nostr client such as [iris.to](https://iris.to) or [snort.social](https://snort.social).
 

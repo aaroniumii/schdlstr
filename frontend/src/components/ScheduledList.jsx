@@ -1,21 +1,22 @@
 // frontend/src/components/ScheduledList.jsx
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useContext, useEffect, useState } from "react";
+import { SignerContext } from "../App";
 
 export default function ScheduledList() {
+  const { pubkey } = useContext(SignerContext);
   const [events, setEvents] = useState([]);
   const [status, setStatus] = useState("");
   const [retryingId, setRetryingId] = useState(null);
-  const [listNotice, setListNotice] = useState("Loading scheduled posts...");
+  const [listNotice, setListNotice] = useState("Connect a signer to view scheduled posts.");
 
   const loadEvents = useCallback(async () => {
-    if (!window.nostr) {
+    if (!pubkey) {
       setEvents([]);
-      setListNotice("Connect a NIP-07 extension to view scheduled posts.");
+      setListNotice("Connect a signer to view scheduled posts.");
       return;
     }
     try {
       setListNotice("Loading scheduled posts...");
-      const pubkey = await window.nostr.getPublicKey();
       const res = await fetch(`/scheduled?pubkey=${pubkey}`);
       if (!res.ok) {
         throw new Error(`Request failed with status ${res.status}`);
@@ -28,7 +29,7 @@ export default function ScheduledList() {
       setEvents([]);
       setListNotice("Unable to load scheduled posts. Try again later.");
     }
-  }, []);
+  }, [pubkey]);
 
   useEffect(() => {
     loadEvents();
@@ -97,4 +98,3 @@ export default function ScheduledList() {
     </div>
   );
 }
-
