@@ -2,6 +2,7 @@ import { SimplePool, finishEvent, generatePrivateKey, getPublicKey, nip19, nip44
 
 const REMOTE_SIGNER_EVENT_KIND = 24133;
 const DEFAULT_TIMEOUT_MS = 15000;
+const AUTH_CHALLENGE_TIMEOUT_MS = 120000;
 const DEFAULT_PERMISSIONS = ["sign_event:1"];
 
 function randomRequestId() {
@@ -202,6 +203,9 @@ export default class BunkerClient {
       return;
     }
     if (message.result === "auth_url" && typeof message.error === "string" && message.error) {
+      if (typeof pending.scheduleTimeout === "function") {
+        pending.scheduleTimeout(AUTH_CHALLENGE_TIMEOUT_MS);
+      }
       if (pending.onAuthUrl) {
         pending.onAuthUrl(message.error);
       }
@@ -240,12 +244,25 @@ export default class BunkerClient {
       const pending = {
         settled: false,
         onAuthUrl,
+        timerId: null,
+        scheduleTimeout: (duration) => {
+          const timeoutMs = typeof duration === "number" ? duration : effectiveTimeout;
+          if (pending.timerId) {
+            clearTimeout(pending.timerId);
+          }
+          pending.timerId = setTimeout(() => {
+            pending.reject(new Error(`Bunker request \"${method}\" timed out.`));
+          }, timeoutMs);
+        },
         resolve: (value) => {
           if (pending.settled) {
             return;
           }
           pending.settled = true;
-          clearTimeout(timerId);
+          if (pending.timerId) {
+            clearTimeout(pending.timerId);
+            pending.timerId = null;
+          }
           this.pending.delete(requestId);
           resolve(value);
         },
@@ -254,14 +271,15 @@ export default class BunkerClient {
             return;
           }
           pending.settled = true;
-          clearTimeout(timerId);
+          if (pending.timerId) {
+            clearTimeout(pending.timerId);
+            pending.timerId = null;
+          }
           this.pending.delete(requestId);
           reject(error instanceof Error ? error : new Error(String(error)));
         },
       };
-      const timerId = setTimeout(() => {
-        pending.reject(new Error(`Bunker request \"${method}\" timed out.`));
-      }, effectiveTimeout);
+      pending.scheduleTimeout(effectiveTimeout);
       this.pending.set(requestId, pending);
       let publishPromises;
       try {
